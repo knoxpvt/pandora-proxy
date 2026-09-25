@@ -1,24 +1,44 @@
 const express = require('express');
-const { createProxyMiddleware } = require('http-proxy-middleware');
 const cors = require('cors');
 
 const app = express();
 app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Health check
-app.get('/', (req, res) => res.send('Pandora Proxy is running.'));
+app.all('/*', async (req, res) => {
+    if (req.path === '/') return res.send('Pandora Proxy V2 is running.');
+    
+    const targetUrl = 'https://www.pandora.com' + req.url;
+    
+    try {
+        const fetchOptions = {
+            method: req.method,
+            headers: {
+                ...req.headers,
+                host: 'www.pandora.com',
+                origin: 'https://www.pandora.com',
+                referer: 'https://www.pandora.com/'
+            }
+        };
+        
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+            fetchOptions.body = JSON.stringify(req.body);
+        }
 
-// Proxy all requests to Pandora
-app.use('/', createProxyMiddleware({
-    target: 'https://www.pandora.com',
-    changeOrigin: true,
-    headers: {
-        'Origin': 'https://www.pandora.com',
-        'Referer': 'https://www.pandora.com/'
-    },
-    onProxyReq: (proxyReq, req, res) => {
-        // Forward client IP if needed or spoof
+        const response = await fetch(targetUrl, fetchOptions);
+        
+        // Forward headers
+        response.headers.forEach((val, key) => {
+            res.setHeader(key, val);
+        });
+
+        const data = await response.text();
+        res.status(response.status).send(data);
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-}));
+});
 
 module.exports = app;
