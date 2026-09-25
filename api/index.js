@@ -3,7 +3,6 @@ module.exports = async function (req, res) {
         return res.status(200).send('Pandora Proxy is alive!');
     }
     
-    // Create target URL
     const targetUrl = 'https://www.pandora.com' + req.url;
     
     try {
@@ -17,7 +16,6 @@ module.exports = async function (req, res) {
             }
         };
         
-        // Remove restricted headers
         delete fetchOptions.headers['connection'];
         delete fetchOptions.headers['content-length'];
         delete fetchOptions.headers['x-forwarded-host'];
@@ -25,7 +23,6 @@ module.exports = async function (req, res) {
         delete fetchOptions.headers['x-forwarded-for'];
         
         if (req.method !== 'GET' && req.method !== 'HEAD') {
-            // we have to handle the request body manually for raw streams
             const getRawBody = () => new Promise((resolve) => {
                 let body = [];
                 req.on('data', chunk => body.push(chunk));
@@ -36,7 +33,6 @@ module.exports = async function (req, res) {
 
         const response = await fetch(targetUrl, fetchOptions);
         
-        // Forward headers
         response.headers.forEach((val, key) => {
             if (key.toLowerCase() !== 'content-encoding' && key.toLowerCase() !== 'content-length' && key.toLowerCase() !== 'transfer-encoding') {
                 res.setHeader(key, val);
@@ -47,6 +43,6 @@ module.exports = async function (req, res) {
         res.status(response.status).send(Buffer.from(arrayBuffer));
 
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: err.message, cause: err.cause ? err.cause.message : 'No cause' });
     }
 };
